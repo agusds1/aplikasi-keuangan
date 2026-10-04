@@ -7,12 +7,15 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "db:push": "drizzle-kit push",
     "db:generate": "drizzle-kit generate",
-    "db:studio": "drizzle-kit studio",
     "db:migrate": "drizzle-kit migrate",
-    "db:seed": "tsx --env-file=.env.local src/lib/db/seed.ts"
+    "db:push": "dotenvx run -f .env.local -- drizzle-kit push",
+    "db:seed": "tsx --env-file=.env.local src/lib/db/seed.ts",
+    "db:studio": "dotenvx run -f .env.local -- drizzle-kit studio",
+    "db:push:prod": "dotenvx run -f .env.production -- drizzle-kit push",
+    "db:seed:prod": "dotenvx run -f .env.production -- tsx src/lib/db/seed.ts"
   },
+  
   "dependencies": {
     "@base-ui/react": "^1.8.0",
     "@hookform/resolvers": "^5.9.1",
@@ -39,12 +42,14 @@
     "zustand": "^5.0.15"
   },
   "devDependencies": {
+    "@dotenvx/dotenvx": "^2.32.4",
     "@tailwindcss/postcss": "^4",
     "@types/bcryptjs": "^3.0.0",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "dotenv": "^18.0.5",
+    "dotenv-cli": "^11.0.0",
     "drizzle-kit": "^0.31.11",
     "eslint": "^9",
     "eslint-config-next": "16.3.8",
