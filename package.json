@@ -15,7 +15,7 @@
     "db:push:prod": "dotenvx run -f .env.production -- drizzle-kit push",
     "db:seed:prod": "dotenvx run -f .env.production -- tsx src/lib/db/seed.ts"
   },
-  
+
   "dependencies": {
     "@base-ui/react": "^1.8.0",
     "@hookform/resolvers": "^5.9.1",
@@ -32,6 +32,7 @@
     "postgres": "^3.4.9",
     "radix-ui": "^1.6.7",
     "react": "19.2.8",
+    "react-day-picker": "^10.0.2",
     "react-dom": "19.2.8",
     "react-hook-form": "^7.89.0",
     "recharts": "^3.10.1",

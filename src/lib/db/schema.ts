@@ -37,6 +37,14 @@ export const transactionTypeEnum = pgEnum('transaction_type', [
   'TRANSFER',  // Pindah antar pos
 ])
 
+export const planStatusEnum = pgEnum('plan_status', [
+  'PENDING',
+  'APPROVED',
+  'REVISION',
+  'REJECTED',
+  'EXECUTED',
+])
+
 // ============================================
 // TABLES
 // ============================================
@@ -165,6 +173,38 @@ export const savingsGoals = pgTable('savings_goals', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
 })
 
+// Rencana Transaksi dengan approval
+export const transactionPlans = pgTable('transaction_plans', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  familyId: uuid('family_id')
+    .notNull()
+    .references(() => families.id, { onDelete: 'cascade' }),
+  categoryId: uuid('category_id')
+    .notNull()
+    .references(() => categories.id),
+  creatorId: uuid('creator_id')
+    .notNull()
+    .references(() => members.id),
+  reviewerId: uuid('reviewer_id')
+    .notNull()
+    .references(() => members.id),
+  amount: decimal('amount', { precision: 15, scale: 2 }).notNull(),
+  type: transactionTypeEnum('type').notNull(),
+  description: text('description'),
+  plannedDate: timestamp('planned_date').notNull(),
+  status: planStatusEnum('status').default('PENDING').notNull(),
+  // Untuk review
+  reviewNote: text('review_note'),
+  reviewedAt: timestamp('reviewed_at'),
+  // Kalau sudah dieksekusi, link ke transaksi
+  executedTransactionId: uuid('executed_transaction_id').references(
+    () => transactions.id,
+    { onDelete: 'set null' }
+  ),
+  executedAt: timestamp('executed_at'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+})
+
 // ============================================
 // RELATIONS
 // ============================================
@@ -231,6 +271,31 @@ export const savingsGoalsRelations = relations(savingsGoals, ({ one }) => ({
   }),
 }))
 
+export const transactionPlansRelations = relations(
+  transactionPlans,
+  ({ one }) => ({
+    family: one(families, {
+      fields: [transactionPlans.familyId],
+      references: [families.id],
+    }),
+    category: one(categories, {
+      fields: [transactionPlans.categoryId],
+      references: [categories.id],
+    }),
+    creator: one(members, {
+      fields: [transactionPlans.creatorId],
+      references: [members.id],
+      relationName: 'planCreator',
+    }),
+    reviewer: one(members, {
+      fields: [transactionPlans.reviewerId],
+      references: [members.id],
+      relationName: 'planReviewer',
+    }),
+  })
+)
+
+
 // ============================================
 // TYPES (infer dari schema)
 // ============================================
@@ -251,3 +316,5 @@ export type SavingsGoal = typeof savingsGoals.$inferSelect
 export type NewSavingsGoal = typeof savingsGoals.$inferInsert
 export type Allocation = typeof allocations.$inferSelect
 export type NewAllocation = typeof allocations.$inferInsert
+export type TransactionPlan = typeof transactionPlans.$inferSelect
+export type NewTransactionPlan = typeof transactionPlans.$inferInsert

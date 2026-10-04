@@ -1,8 +1,8 @@
 import { cookies } from 'next/headers'
 import { db } from '@/lib/db'
-import { users } from '@/lib/db/schema'
 import { eq } from 'drizzle-orm'
 import bcrypt from 'bcryptjs'
+import { users, members } from '@/lib/db/schema'
 
 const SESSION_COOKIE = 'family_session'
 const ACTIVE_MEMBER_COOKIE = 'active_member'
@@ -73,4 +73,21 @@ export async function setActiveMember(memberId: string) {
 export async function getActiveMemberId() {
   const cookieStore = await cookies()
   return cookieStore.get(ACTIVE_MEMBER_COOKIE)?.value ?? null
+}
+
+// Verifikasi PIN member
+export async function verifyMemberPin(memberId: string, pin: string) {
+  const [member] = await db
+    .select()
+    .from(members)
+    .where(eq(members.id, memberId))
+    .limit(1)
+
+  if (!member) return { error: 'Member tidak ditemukan' }
+  if (!member.pinHash) return { success: true, needsSetup: true }
+
+  const valid = await bcrypt.compare(pin, member.pinHash)
+  if (!valid) return { error: 'PIN salah' }
+
+  return { success: true, needsSetup: false }
 }

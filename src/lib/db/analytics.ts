@@ -28,7 +28,9 @@ export async function getMonthlySummary(familyId: string, date = new Date()) {
   const result = await db
     .select({
       type: transactions.type,
-      total: sum(transactions.amount),
+      total: sql<string>`COALESCE(SUM(${transactions.amount}), 0)`.as(
+        'total'
+      ),
     })
     .from(transactions)
     .where(
@@ -40,11 +42,7 @@ export async function getMonthlySummary(familyId: string, date = new Date()) {
     )
     .groupBy(transactions.type)
 
-  const summary = {
-    income: 0,
-    expense: 0,
-    transfer: 0,
-  }
+  const summary = { income: 0, expense: 0, transfer: 0 }
 
   for (const row of result) {
     const amount = parseFloat(row.total ?? '0')
@@ -64,7 +62,8 @@ export async function getCategoryBreakdown(
   const { start, end } = getMonthRange(date)
   const period = getPeriod(date)
 
-  const result = await db
+  // Query 1: kategori + alokasi (JANGAN join transactions!)
+  const cats = await db
     .select({
       categoryId: categories.id,
       categoryName: categories.name,
@@ -72,9 +71,6 @@ export async function getCategoryBreakdown(
       categoryColor: categories.color,
       categoryType: categories.type,
       planned: allocations.plannedAmount,
-      actual: sql<string>`COALESCE(SUM(${transactions.amount}), 0)`.as(
-        'actual'
-      ),
     })
     .from(categories)
     .leftJoin(
@@ -84,34 +80,40 @@ export async function getCategoryBreakdown(
         eq(allocations.period, period)
       )
     )
-    .leftJoin(
-      transactions,
+    .where(eq(categories.familyId, familyId))
+    .orderBy(categories.sortOrder)
+
+  // Query 2: sum transaksi per kategori (terpisah)
+  const txTotals = await db
+    .select({
+      categoryId: transactions.categoryId,
+      total: sql<string>`SUM(${transactions.amount})`.as('total'),
+    })
+    .from(transactions)
+    .where(
       and(
-        eq(transactions.categoryId, categories.id),
+        eq(transactions.familyId, familyId),
         gte(transactions.date, start),
         lte(transactions.date, end)
       )
     )
-    .where(eq(categories.familyId, familyId))
-    .groupBy(
-      categories.id,
-      categories.name,
-      categories.icon,
-      categories.color,
-      categories.type,
-      allocations.plannedAmount
-    )
-    .orderBy(categories.sortOrder)
+    .groupBy(transactions.categoryId)
 
-  return result.map((r) => ({
-    ...r,
-    planned: parseFloat(r.planned ?? '0'),
-    actual: parseFloat(r.actual ?? '0'),
-    percentage:
-      r.planned && parseFloat(r.planned) > 0
-        ? (parseFloat(r.actual ?? '0') / parseFloat(r.planned)) * 100
-        : 0,
-  }))
+  const totalMap = new Map(
+    txTotals.map((t) => [t.categoryId, parseFloat(t.total ?? '0')])
+  )
+
+  return cats.map((c) => {
+    const actual = totalMap.get(c.categoryId) ?? 0
+    const planned = parseFloat(c.planned ?? '0')
+
+    return {
+      ...c,
+      planned,
+      actual,
+      percentage: planned > 0 ? (actual / planned) * 100 : 0,
+    }
+  })
 }
 
 // 3. Breakdown per member (siapa pengeluaran berapa)
@@ -127,7 +129,9 @@ export async function getMemberBreakdown(
       memberName: members.name,
       memberAvatar: members.avatar,
       memberColor: members.color,
-      total: sql<string>`COALESCE(SUM(${transactions.amount}), 0)`.as('total'),
+      total: sql<string>`COALESCE(SUM(${transactions.amount}), 0)`.as(
+        'total'
+      ),
     })
     .from(members)
     .leftJoin(
@@ -184,7 +188,9 @@ export async function getExpenseByCategory(
       categoryName: categories.name,
       categoryIcon: categories.icon,
       categoryColor: categories.color,
-      total: sql<string>`COALESCE(SUM(${transactions.amount}), 0)`.as('total'),
+      total: sql<string>`COALESCE(SUM(${transactions.amount}), 0)`.as(
+        'total'
+      ),
     })
     .from(transactions)
     .innerJoin(categories, eq(transactions.categoryId, categories.id))
@@ -227,7 +233,9 @@ export async function getMonthlyTrend(familyId: string, months = 6) {
     const rows = await db
       .select({
         type: transactions.type,
-        total: sum(transactions.amount),
+        total: sql<string>`COALESCE(SUM(${transactions.amount}), 0)`.as(
+          'total'
+        ),
       })
       .from(transactions)
       .where(
@@ -240,13 +248,9 @@ export async function getMonthlyTrend(familyId: string, months = 6) {
       .groupBy(transactions.type)
 
     const income =
-      parseFloat(
-        rows.find((r) => r.type === 'INCOME')?.total ?? '0'
-      ) || 0
+      parseFloat(rows.find((r) => r.type === 'INCOME')?.total ?? '0') || 0
     const expense =
-      parseFloat(
-        rows.find((r) => r.type === 'EXPENSE')?.total ?? '0'
-      ) || 0
+      parseFloat(rows.find((r) => r.type === 'EXPENSE')?.total ?? '0') || 0
 
     results.push({
       period: getPeriod(date),

@@ -9,6 +9,7 @@ import { CategoryList } from '@/components/settings/category-list'
 import { logoutAction } from '@/app/actions/auth'
 import { Button } from '@/components/ui/button'
 import { LogOut, Wallet } from 'lucide-react'
+import { SetPinSection } from '@/components/settings/set-pin-section'
 
 export default async function SettingsPage() {
   const activeMemberId = await getActiveMemberId()
@@ -49,6 +50,11 @@ export default async function SettingsPage() {
           <CategoryList categories={categories} />
         </TabsContent>
       </Tabs>
+
+      {/* PIN Section */}
+      <div className="pt-6 border-t">
+        <SetPinSection hasPin={!!activeMember.pinHash} />
+      </div>
 
       {/* Danger zone */}
       <div className="pt-6 border-t mt-6 space-y-3">

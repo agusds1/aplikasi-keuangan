@@ -1,11 +1,19 @@
-export function formatCurrency(amount: string | number, compact = false) {
-  const num = typeof amount === 'string' ? parseFloat(amount) : amount
+export function formatCurrency(
+  amount: string | number | undefined | null,
+  _compact = false // diabaikan, selalu tampilkan lengkap
+) {
+  const num =
+    typeof amount === 'string'
+      ? parseFloat(amount)
+      : typeof amount === 'number'
+        ? amount
+        : 0
+
   return new Intl.NumberFormat('id-ID', {
     style: 'currency',
     currency: 'IDR',
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
-    notation: compact ? 'compact' : 'standard',
   }).format(num)
 }
 
