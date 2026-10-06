@@ -8,11 +8,12 @@ import { CategoryProgress } from '@/components/dashboard/category-progress'
 import { MemberBreakdown } from '@/components/dashboard/member-breakdown'
 import { format } from 'date-fns'
 import { id as idLocale } from 'date-fns/locale'
-import { getPendingPlansCount } from '@/lib/db/queries'
 import Link from 'next/link'
 import { ClipboardList, BarChart3 } from 'lucide-react'
 import { getUpcomingPlans } from '@/lib/db/queries'
 import { Bell, AlertCircle } from 'lucide-react'
+import { PlanRecapCard } from '@/components/dashboard/plan-recap-card'
+import { getActivePlans, getPendingPlansCount } from '@/lib/db/queries'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -25,10 +26,12 @@ export default async function DashboardPage() {
     .where(eq(members.id, activeMemberId!))
     .limit(1)
 
-  const [summary, categoryBreakdown, memberBreakdown] = await Promise.all([
+  const [summary, categoryBreakdown, memberBreakdown, activePlans] =
+  await Promise.all([
     getMonthlySummary(activeMember.familyId),
     getCategoryBreakdown(activeMember.familyId),
     getMemberBreakdown(activeMember.familyId),
+    getActivePlans(activeMember.familyId),
   ])
 
 
@@ -120,6 +123,9 @@ export default async function DashboardPage() {
         expense={summary.expense}
         saving={totalSaving}
       />
+
+      {/* Rekap Rencana Transaksi */}
+      <PlanRecapCard plans={activePlans} />
 
       {/* Progress Alokasi */}
       <div>

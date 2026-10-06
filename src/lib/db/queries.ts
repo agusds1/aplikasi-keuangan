@@ -3,6 +3,8 @@ import { categories, members, transactions } from './schema'
 import { transactionPlans } from './schema'
 import { and, desc, eq, inArray, ne, or, gte, lte } from 'drizzle-orm'
 
+
+
 export async function getCategoriesByFamily(familyId: string) {
   return db
     .select()
@@ -137,6 +139,76 @@ export async function getUpcomingPlans(
       )
     )
     .orderBy(transactionPlans.plannedDate)
+
+  return rows
+}
+
+export async function getPlanRecapByMonth(
+  familyId: string,
+  date = new Date()
+) {
+  const start = new Date(date.getFullYear(), date.getMonth(), 1)
+  const end = new Date(
+    date.getFullYear(),
+    date.getMonth() + 1,
+    0,
+    23,
+    59,
+    59
+  )
+
+  const rows = await db
+    .select({
+      planId: transactionPlans.id,
+      amount: transactionPlans.amount,
+      type: transactionPlans.type,
+      status: transactionPlans.status,
+      plannedDate: transactionPlans.plannedDate,
+      categoryId: categories.id,
+      categoryName: categories.name,
+      categoryIcon: categories.icon,
+      categoryColor: categories.color,
+      categoryType: categories.type,
+    })
+    .from(transactionPlans)
+    .leftJoin(categories, eq(transactionPlans.categoryId, categories.id))
+    .where(
+      and(
+        eq(transactionPlans.familyId, familyId),
+        gte(transactionPlans.plannedDate, start),
+        lte(transactionPlans.plannedDate, end),
+        // Hanya yang belum dieksekusi
+        ne(transactionPlans.status, 'EXECUTED')
+      )
+    )
+    .orderBy(desc(transactionPlans.plannedDate))
+
+  return rows
+}
+
+export async function getActivePlans(familyId: string) {
+  const rows = await db
+    .select({
+      planId: transactionPlans.id,
+      amount: transactionPlans.amount,
+      type: transactionPlans.type,
+      status: transactionPlans.status,
+      plannedDate: transactionPlans.plannedDate,
+      categoryId: categories.id,
+      categoryName: categories.name,
+      categoryIcon: categories.icon,
+      categoryColor: categories.color,
+      categoryType: categories.type,
+    })
+    .from(transactionPlans)
+    .leftJoin(categories, eq(transactionPlans.categoryId, categories.id))
+    .where(
+      and(
+        eq(transactionPlans.familyId, familyId),
+        ne(transactionPlans.status, 'EXECUTED')
+      )
+    )
+    .orderBy(desc(transactionPlans.plannedDate))
 
   return rows
 }
