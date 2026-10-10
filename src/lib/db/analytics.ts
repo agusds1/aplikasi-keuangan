@@ -262,3 +262,182 @@ export async function getMonthlyTrend(familyId: string, months = 6) {
 
   return results
 }
+
+// ============================================
+// SUMMARY DENGAN FILTER RANGE + BREAKDOWN
+// ============================================
+
+type DateRange = {
+  start?: Date
+  end?: Date
+}
+
+// Helper: build where clause berdasarkan range
+function buildRangeWhere(
+  familyId: string,
+  range?: DateRange,
+  typeFilter?: 'INCOME' | 'EXPENSE' | 'SAVING'
+) {
+  const conditions = [eq(transactions.familyId, familyId)]
+
+  if (range?.start) {
+    // Set ke AWAL hari (00:00:00)
+    const start = new Date(range.start)
+    start.setHours(0, 0, 0, 0)
+    conditions.push(gte(transactions.date, start))
+  }
+  if (range?.end) {
+    // Set ke AKHIR hari (23:59:59.999)
+    const end = new Date(range.end)
+    end.setHours(23, 59, 59, 999)
+    conditions.push(lte(transactions.date, end))
+  }
+
+  if (typeFilter === 'INCOME') {
+    conditions.push(eq(transactions.type, 'INCOME'))
+  } else if (typeFilter === 'EXPENSE') {
+    conditions.push(eq(transactions.type, 'EXPENSE'))
+  }
+
+  return and(...conditions)
+}
+
+// 1. Total Pemasukan dengan range + breakdown per kategori+member
+export async function getIncomeSummary(range?: DateRange) {
+  const familyId = await getFamilyIdFromSession()
+  if (!familyId) return { total: 0, breakdown: [] }
+
+  const rows = await db
+    .select({
+      categoryId: categories.id,
+      categoryName: categories.name,
+      categoryIcon: categories.icon,
+      categoryColor: categories.color,
+      memberId: members.id,
+      memberName: members.name,
+      memberAvatar: members.avatar,
+      memberColor: members.color,
+      memberRole: members.role,
+      total: sql<string>`COALESCE(SUM(${transactions.amount}), 0)`.as('total'),
+    })
+    .from(transactions)
+    .innerJoin(categories, eq(transactions.categoryId, categories.id))
+    .innerJoin(members, eq(transactions.memberId, members.id))
+    .where(buildRangeWhere(familyId, range, 'INCOME'))
+    .groupBy(
+      categories.id,
+      categories.name,
+      categories.icon,
+      categories.color,
+      members.id,
+      members.name,
+      members.avatar,
+      members.color,
+      members.role
+    )
+    .orderBy(desc(sql`total`))
+
+  const total = rows.reduce((sum, r) => sum + parseFloat(r.total ?? '0'), 0)
+
+  return {
+    total,
+    breakdown: rows.map((r) => ({
+      ...r,
+      total: parseFloat(r.total ?? '0'),
+    })),
+  }
+}
+
+// 2. Total Pengeluaran dengan range (tanpa breakdown)
+export async function getExpenseSummary(range?: DateRange) {
+  const familyId = await getFamilyIdFromSession()
+  if (!familyId) return { total: 0 }
+
+  const result = await db
+    .select({
+      total: sql<string>`COALESCE(SUM(${transactions.amount}), 0)`.as('total'),
+    })
+    .from(transactions)
+    .where(buildRangeWhere(familyId, range, 'EXPENSE'))
+
+  return {
+    total: parseFloat(result[0]?.total ?? '0'),
+  }
+}
+
+// 3. Total Tabungan dengan range + breakdown per kategori+member
+export async function getSavingSummary(range?: DateRange) {
+  const familyId = await getFamilyIdFromSession()
+  if (!familyId) return { total: 0, breakdown: [] }
+
+  const conditions = [
+    eq(transactions.familyId, familyId),
+    eq(categories.type, 'SAVING'),
+  ]
+
+  if (range?.start) {
+    const start = new Date(range.start)
+    start.setHours(0, 0, 0, 0)
+    conditions.push(gte(transactions.date, start))
+  }
+  if (range?.end) {
+    const end = new Date(range.end)
+    end.setHours(23, 59, 59, 999)
+    conditions.push(lte(transactions.date, end))
+  }
+
+  const rows = await db
+    .select({
+      categoryId: categories.id,
+      categoryName: categories.name,
+      categoryIcon: categories.icon,
+      categoryColor: categories.color,
+      memberId: members.id,
+      memberName: members.name,
+      memberAvatar: members.avatar,
+      memberColor: members.color,
+      memberRole: members.role,
+      total: sql<string>`COALESCE(SUM(${transactions.amount}), 0)`.as('total'),
+    })
+    .from(transactions)
+    .innerJoin(categories, eq(transactions.categoryId, categories.id))
+    .innerJoin(members, eq(transactions.memberId, members.id))
+    .where(and(...conditions))
+    .groupBy(
+      categories.id,
+      categories.name,
+      categories.icon,
+      categories.color,
+      members.id,
+      members.name,
+      members.avatar,
+      members.color,
+      members.role
+    )
+    .orderBy(desc(sql`total`))
+
+  const total = rows.reduce((sum, r) => sum + parseFloat(r.total ?? '0'), 0)
+
+  return {
+    total,
+    breakdown: rows.map((r) => ({
+      ...r,
+      total: parseFloat(r.total ?? '0'),
+    })),
+  }
+}
+
+// Helper: ambil familyId dari session
+async function getFamilyIdFromSession() {
+  const { getActiveMemberId } = await import('./../auth/session')
+  const memberId = await getActiveMemberId()
+  if (!memberId) return null
+
+  const [member] = await db
+    .select({ familyId: members.familyId })
+    .from(members)
+    .where(eq(members.id, memberId))
+    .limit(1)
+
+  return member?.familyId ?? null
+}
