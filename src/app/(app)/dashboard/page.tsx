@@ -41,12 +41,10 @@ export default async function DashboardPage({
     .where(eq(members.id, activeMemberId!))
     .limit(1)
 
-  // Decode filter range dari URL
   const incomeRange = decodeRange(params.income)
   const expenseRange = decodeRange(params.expense)
   const savingRange = decodeRange(params.saving)
 
-  // Ambil data (pararel) - TERMASUK NET WORTH
   const [
     incomeSummary,
     expenseSummary,
@@ -64,24 +62,24 @@ export default async function DashboardPage({
     getMemberBreakdown(activeMember.familyId),
     getActivePlans(activeMember.familyId),
     getPendingPlansCount(activeMember.familyId, activeMemberId!),
-    getNetWorthData(activeMember.familyId), // <-- Data Net Worth
+    getNetWorthData(activeMember.familyId),
   ])
 
   return (
-    <div className="space-y-6">
+    // UBAH space-y-6 MENJADI space-y-3 AGAR SERAGAM
+    <div className="space-y-3 pb-6">
+      
       {/* Greeting */}
-      <div>
+      <div className="mb-1">
         <p className="text-sm text-muted-foreground">
           {format(new Date(), 'EEEE, d MMMM yyyy', { locale: idLocale })}
         </p>
         <h1 className="text-xl font-bold flex items-center gap-2">
-          <span>
-            Halo, {activeMember.avatar} {activeMember.name}
-          </span>
+          <span>Halo, {activeMember.avatar} {activeMember.name}</span>
         </h1>
       </div>
 
-      {/* NET WORTH CARD - Sesuai Kaidah Akuntansi */}
+      {/* NET WORTH CARD */}
       <NetWorthCard
         totalCash={netWorthData.totalCash}
         totalAssets={netWorthData.totalAssets}
@@ -89,10 +87,10 @@ export default async function DashboardPage({
         netWorth={netWorthData.netWorth}
       />
 
-      {/* Alert Rencana Menunggu Persetujuan */}
+      {/* Alert Rencana Menunggu Persetujuan (Card Notifikasi) */}
       {pendingPlans > 0 && (
         <Link href="/plans">
-          <div className="rounded-xl bg-primary/5 border border-primary/20 p-4 flex items-center justify-between hover:bg-primary/10 transition-colors">
+          <div className="rounded-xl bg-primary/5 border border-primary/20 p-4 flex items-center justify-between hover:bg-primary/10 transition-colors h-[72px]">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-full bg-primary/20 flex items-center justify-center">
                 <ClipboardList className="h-5 w-5 text-primary" />
@@ -109,19 +107,11 @@ export default async function DashboardPage({
         </Link>
       )}
 
-      {/* Summary Cards — Client Wrapper (Pemasukan, Pengeluaran, Tabungan) */}
+      {/* Summary Cards */}
       <SummaryCardsWrapper
-        income={{
-          total: incomeSummary.total,
-          breakdown: incomeSummary.breakdown,
-        }}
-        expense={{
-          total: expenseSummary.total,
-        }}
-        saving={{
-          total: savingSummary.total,
-          breakdown: savingSummary.breakdown,
-        }}
+        income={{ total: incomeSummary.total, breakdown: incomeSummary.breakdown }}
+        expense={{ total: expenseSummary.total }}
+        saving={{ total: savingSummary.total, breakdown: savingSummary.breakdown }}
       />
 
       {/* Rekap Rencana Transaksi */}
@@ -129,7 +119,7 @@ export default async function DashboardPage({
 
       {/* Progress Alokasi */}
       <div>
-        <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center justify-between mb-3 mt-4">
           <h2 className="text-sm font-bold">📊 Progress Anggaran</h2>
           <span className="text-xs text-muted-foreground">
             {format(new Date(), 'MMMM yyyy', { locale: idLocale })}
@@ -140,27 +130,27 @@ export default async function DashboardPage({
 
       {/* Breakdown per Member */}
       <div>
-        <h2 className="text-sm font-bold mb-3">👥 Pengeluaran per Anggota</h2>
+        <h2 className="text-sm font-bold mb-3 mt-4">👥 Pengeluaran per Anggota</h2>
         <MemberBreakdown data={memberBreakdown} />
       </div>
 
       {/* Quick link ke Laporan */}
-      <Link href="/reports">
-        <div className="rounded-xl bg-card border p-4 flex items-center justify-between hover:bg-muted/50 transition-colors">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center">
-              <BarChart3 className="h-5 w-5" />
+      <div className="mt-4">
+        <Link href="/reports">
+          <div className="rounded-xl bg-card border p-4 flex items-center justify-between hover:bg-muted/50 transition-colors h-[72px]">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center">
+                <BarChart3 className="h-5 w-5" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold">Lihat Laporan Lengkap</p>
+                <p className="text-xs text-muted-foreground">Grafik pengeluaran & tren</p>
+              </div>
             </div>
-            <div>
-              <p className="text-sm font-semibold">Lihat Laporan Lengkap</p>
-              <p className="text-xs text-muted-foreground">
-                Grafik pengeluaran & tren
-              </p>
-            </div>
+            <span className="text-muted-foreground">→</span>
           </div>
-          <span className="text-muted-foreground">→</span>
-        </div>
-      </Link>
+        </Link>
+      </div>
     </div>
   )
 }
