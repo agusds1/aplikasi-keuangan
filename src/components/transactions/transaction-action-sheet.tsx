@@ -18,20 +18,21 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Edit2, Trash2, Loader2 } from 'lucide-react'
-import type { Category } from '@/lib/db/schema'
+import type { Category, Account } from '@/lib/db/schema'
 import {
   updateTransactionAction,
   deleteTransactionAction,
 } from '@/app/actions/transactions'
 import { cn } from '@/lib/utils'
+import { CurrencyInput } from '@/components/ui/currency-input'
 
 type TransactionData = {
   id: string
   categoryId: string
-  type: 'INCOME' | 'EXPENSE' | 'TRANSFER'
+  accountId: string | null
+  type: 'INCOME' | 'EXPENSE' | 'TRANSFER' | 'LOAN_RECEIVE' | 'ASSET_SALE'
   amount: string
   description: string | null
   date: Date
@@ -40,6 +41,7 @@ type TransactionData = {
 type Props = {
   transaction: TransactionData
   categories: Category[]
+  accounts: Account[]
   open: boolean
   onOpenChange: (open: boolean) => void
 }
@@ -47,6 +49,7 @@ type Props = {
 export function TransactionActionSheet({
   transaction,
   categories,
+  accounts,
   open,
   onOpenChange,
 }: Props) {
@@ -61,7 +64,14 @@ export function TransactionActionSheet({
   const [selectedCategoryId, setSelectedCategoryId] = useState(
     transaction.categoryId
   )
-  const [amount, setAmount] = useState(transaction.amount)
+  const [selectedAccountId, setSelectedAccountId] = useState(
+    transaction.accountId || accounts[0]?.id || ''
+  )
+  
+  // Ubah state amount menjadi string murni angka
+  const [amount, setAmount] = useState(
+    Math.round(parseFloat(transaction.amount)).toString()
+  )
 
   const filteredCategories = categories.filter((c) => {
     if (selectedType === 'INCOME') return c.type === 'INCOME'
@@ -72,21 +82,17 @@ export function TransactionActionSheet({
     e.preventDefault()
     setError(null)
 
-    if (!selectedCategoryId) {
-      setError('Pilih kategori dulu')
-      return
-    }
+    if (!selectedCategoryId) return setError('Pilih kategori dulu')
+    if (!selectedAccountId) return setError('Pilih dompet dulu')
 
     const numAmount = parseFloat(amount)
-    if (!numAmount || numAmount <= 0) {
-      setError('Nominal tidak valid')
-      return
-    }
+    if (!numAmount || numAmount <= 0) return setError('Nominal tidak valid')
 
     setLoading(true)
 
     const result = await updateTransactionAction(transaction.id, {
       categoryId: selectedCategoryId,
+      accountId: selectedAccountId,
       type: selectedType,
       amount: numAmount,
       date: transaction.date.toISOString(),
@@ -168,7 +174,6 @@ export function TransactionActionSheet({
               </SheetHeader>
 
               <form onSubmit={handleUpdate} className="space-y-4 mt-4">
-                {/* Type switcher */}
                 <div className="grid grid-cols-2 gap-2">
                   <Button
                     type="button"
@@ -192,22 +197,34 @@ export function TransactionActionSheet({
                   </Button>
                 </div>
 
-                {/* Amount */}
                 <div className="space-y-2">
                   <Label htmlFor="edit-amount">Nominal</Label>
-                  <Input
+                  {/* GANTI INPUT BIASA MENJADI CURRENCY INPUT */}
+                  <CurrencyInput
                     id="edit-amount"
-                    type="number"
-                    inputMode="numeric"
                     value={amount}
-                    onChange={(e) => setAmount(e.target.value)}
-                    min={1}
-                    required
+                    onChange={setAmount}
                     className="text-lg font-semibold"
                   />
                 </div>
 
-                {/* Category picker */}
+                {/* Pilihan Dompet */}
+                <div className="space-y-2">
+                  <Label>Uang dari Dompet</Label>
+                  <select
+                    value={selectedAccountId}
+                    onChange={(e) => setSelectedAccountId(e.target.value)}
+                    className="w-full h-10 px-3 rounded-md border border-input bg-background text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                    required
+                  >
+                    {accounts.map((acc) => (
+                      <option key={acc.id} value={acc.id}>
+                        {acc.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
                 <div className="space-y-2">
                   <Label>Kategori</Label>
                   <div className="grid grid-cols-3 gap-2">
@@ -257,7 +274,6 @@ export function TransactionActionSheet({
         </SheetContent>
       </Sheet>
 
-      {/* Delete confirmation */}
       <AlertDialog open={confirmDelete} onOpenChange={setConfirmDelete}>
         <AlertDialogContent>
           <AlertDialogHeader>

@@ -5,7 +5,7 @@ import { MemberBadge } from '@/components/shared/member-badge'
 import { TransactionActionSheet } from './transaction-action-sheet'
 import { format } from 'date-fns'
 import { id as idLocale } from 'date-fns/locale'
-import type { Category } from '@/lib/db/schema'
+import type { Category, Account } from '@/lib/db/schema'
 
 function formatCurrency(amount: string | number) {
   const num = typeof amount === 'string' ? parseFloat(amount) : amount
@@ -19,9 +19,10 @@ function formatCurrency(amount: string | number) {
 type TransactionItem = {
   id: string
   amount: string
-  type: 'INCOME' | 'EXPENSE' | 'TRANSFER'
+  type: string
   description: string | null
   date: Date
+  accountId: string | null
   category: {
     id: string
     name: string
@@ -41,9 +42,10 @@ type TransactionItem = {
 type Props = {
   transactions: TransactionItem[]
   categories: Category[]
+  accounts: Account[]
 }
 
-export function TransactionList({ transactions, categories }: Props) {
+export function TransactionList({ transactions, categories, accounts }: Props) {
   const [selected, setSelected] = useState<TransactionItem | null>(null)
 
   return (
@@ -73,10 +75,12 @@ export function TransactionList({ transactions, categories }: Props) {
                 </div>
                 <p
                   className={`font-semibold text-sm whitespace-nowrap ${
-                    tx.type === 'INCOME' ? 'text-green-600' : 'text-red-600'
+                    tx.type === 'INCOME' || tx.type === 'LOAN_RECEIVE' || tx.type === 'ASSET_SALE'
+                      ? 'text-green-600'
+                      : 'text-red-600'
                   }`}
                 >
-                  {tx.type === 'INCOME' ? '+' : '-'}
+                  {tx.type === 'INCOME' || tx.type === 'LOAN_RECEIVE' || tx.type === 'ASSET_SALE' ? '+' : '-'}
                   {formatCurrency(tx.amount)}
                 </p>
               </div>
@@ -90,10 +94,7 @@ export function TransactionList({ transactions, categories }: Props) {
                   />
                 )}
                 <span className="text-[10px] text-muted-foreground">
-                  ·{' '}
-                  {format(new Date(tx.date), 'd MMM yyyy', {
-                    locale: idLocale,
-                  })}
+                  · {format(new Date(tx.date), 'd MMM yyyy', { locale: idLocale })}
                 </span>
               </div>
             </div>
@@ -106,12 +107,14 @@ export function TransactionList({ transactions, categories }: Props) {
           transaction={{
             id: selected.id,
             categoryId: selected.category?.id ?? '',
-            type: selected.type,
+            accountId: selected.accountId,
+            type: selected.type as any,
             amount: selected.amount,
             description: selected.description,
             date: new Date(selected.date),
           }}
           categories={categories}
+          accounts={accounts}
           open={!!selected}
           onOpenChange={(open) => !open && setSelected(null)}
         />

@@ -1,5 +1,5 @@
 import { db } from './index'
-import { categories, members, transactions } from './schema'
+import { categories, members, transactions, accounts } from './schema'
 import { transactionPlans } from './schema'
 import { and, desc, eq, inArray, ne, or, gte, lte } from 'drizzle-orm'
 
@@ -28,6 +28,7 @@ export async function getRecentTransactions(familyId: string, limit = 50) {
       type: transactions.type,
       description: transactions.description,
       date: transactions.date,
+      accountId: transactions.accountId, // <-- TAMBAHAN INI
       createdAt: transactions.createdAt,
       category: {
         id: categories.id,
@@ -211,4 +212,12 @@ export async function getActivePlans(familyId: string) {
     .orderBy(desc(transactionPlans.plannedDate))
 
   return rows
+}
+
+export async function getAccountsByFamily(familyId: string) {
+  return db
+    .select()
+    .from(accounts)
+    .where(and(eq(accounts.familyId, familyId), eq(accounts.isActive, true)))
+    .orderBy(accounts.createdAt)
 }

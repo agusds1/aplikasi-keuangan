@@ -2,14 +2,15 @@
 
 import { revalidatePath } from 'next/cache'
 import { db } from '@/lib/db'
-import { transactions, members } from '@/lib/db/schema'
+import { transactions, members, accounts } from '@/lib/db/schema'
 import { getActiveMemberId, getCurrentUser } from '@/lib/auth/session'
-import { eq, and } from 'drizzle-orm'
+import { eq, and, sql } from 'drizzle-orm'
 import { z } from 'zod'
 
 const transactionSchema = z.object({
   categoryId: z.string().uuid(),
-  type: z.enum(['INCOME', 'EXPENSE', 'TRANSFER']),
+  accountId: z.string().uuid(),
+  type: z.enum(['INCOME', 'EXPENSE', 'TRANSFER', 'LOAN_RECEIVE', 'ASSET_SALE']),
   amount: z.coerce.number().positive('Nominal harus lebih dari 0'),
   description: z.string().optional(),
   date: z.string(),
@@ -17,7 +18,8 @@ const transactionSchema = z.object({
 
 export async function createTransactionAction(input: {
   categoryId: string
-  type: 'INCOME' | 'EXPENSE' | 'TRANSFER'
+  accountId: string
+  type: 'INCOME' | 'EXPENSE' | 'TRANSFER' | 'LOAN_RECEIVE' | 'ASSET_SALE'
   amount: number
   description?: string
   date: string
@@ -28,32 +30,38 @@ export async function createTransactionAction(input: {
   const memberId = await getActiveMemberId()
   if (!memberId) return { error: 'Tidak ada profil aktif' }
 
-  const [member] = await db
-    .select()
-    .from(members)
-    .where(eq(members.id, memberId))
-    .limit(1)
-
+  const [member] = await db.select().from(members).where(eq(members.id, memberId)).limit(1)
   if (!member) return { error: 'Member tidak ditemukan' }
 
   const parsed = transactionSchema.safeParse(input)
-  if (!parsed.success) {
-    return { error: parsed.error.issues[0].message }
-  }
+  if (!parsed.success) return { error: parsed.error.issues[0].message }
 
   try {
+    // 1. Simpan Transaksi
     await db.insert(transactions).values({
       familyId: member.familyId,
       categoryId: parsed.data.categoryId,
+      accountId: parsed.data.accountId,
       memberId: member.id,
-      amount: parsed.data.amount.toString(),
+      amount: Math.round(parsed.data.amount).toString(),
       type: parsed.data.type,
       description: parsed.data.description || null,
       date: new Date(parsed.data.date),
     })
 
+    // 2. Update Saldo Dompet
+    const isIncome = ['INCOME', 'LOAN_RECEIVE', 'ASSET_SALE'].includes(parsed.data.type)
+    const balanceChange = isIncome 
+      ? sql`${accounts.currentBalance} + ${parsed.data.amount}`
+      : sql`${accounts.currentBalance} - ${parsed.data.amount}`
+
+    await db.update(accounts)
+      .set({ currentBalance: balanceChange })
+      .where(eq(accounts.id, parsed.data.accountId))
+
     revalidatePath('/transactions')
     revalidatePath('/dashboard')
+    revalidatePath('/accounts')
     return { success: true }
   } catch (err) {
     console.error(err)
@@ -65,7 +73,8 @@ export async function updateTransactionAction(
   transactionId: string,
   input: {
     categoryId: string
-    type: 'INCOME' | 'EXPENSE' | 'TRANSFER'
+    accountId: string
+    type: 'INCOME' | 'EXPENSE' | 'TRANSFER' | 'LOAN_RECEIVE' | 'ASSET_SALE'
     amount: number
     description?: string
     date: string
@@ -74,39 +83,45 @@ export async function updateTransactionAction(
   const memberId = await getActiveMemberId()
   if (!memberId) return { error: 'Tidak ada profil aktif' }
 
-  const [member] = await db
-    .select()
-    .from(members)
-    .where(eq(members.id, memberId))
-    .limit(1)
-
+  const [member] = await db.select().from(members).where(eq(members.id, memberId)).limit(1)
   if (!member) return { error: 'Member tidak ditemukan' }
 
   const parsed = transactionSchema.safeParse(input)
-  if (!parsed.success) {
-    return { error: parsed.error.issues[0].message }
-  }
+  if (!parsed.success) return { error: parsed.error.issues[0].message }
 
   try {
-    await db
-      .update(transactions)
-      .set({
-        categoryId: parsed.data.categoryId,
-        type: parsed.data.type,
-        amount: parsed.data.amount.toString(),
-        description: parsed.data.description || null,
-        date: new Date(parsed.data.date),
-      })
-      .where(
-        and(
-          eq(transactions.id, transactionId),
-          eq(transactions.familyId, member.familyId)
-        )
-      )
+    const [oldTx] = await db.select().from(transactions).where(eq(transactions.id, transactionId)).limit(1)
+    if (!oldTx) return { error: 'Transaksi tidak ditemukan' }
+
+    // 1. Kembalikan saldo dompet lama
+    const oldIsIncome = ['INCOME', 'LOAN_RECEIVE', 'ASSET_SALE'].includes(oldTx.type)
+    const revertChange = oldIsIncome 
+      ? sql`${accounts.currentBalance} - ${oldTx.amount}`
+      : sql`${accounts.currentBalance} + ${oldTx.amount}`
+    
+    await db.update(accounts).set({ currentBalance: revertChange }).where(eq(accounts.id, oldTx.accountId!))
+
+    // 2. Update Transaksi
+    await db.update(transactions).set({
+      categoryId: parsed.data.categoryId,
+      accountId: parsed.data.accountId,
+      type: parsed.data.type,
+      amount: Math.round(parsed.data.amount).toString(),
+      description: parsed.data.description || null,
+      date: new Date(parsed.data.date),
+    }).where(eq(transactions.id, transactionId))
+
+    // 3. Terapkan saldo dompet baru
+    const newIsIncome = ['INCOME', 'LOAN_RECEIVE', 'ASSET_SALE'].includes(parsed.data.type)
+    const applyChange = newIsIncome
+      ? sql`${accounts.currentBalance} + ${parsed.data.amount}`
+      : sql`${accounts.currentBalance} - ${parsed.data.amount}`
+
+    await db.update(accounts).set({ currentBalance: applyChange }).where(eq(accounts.id, parsed.data.accountId))
 
     revalidatePath('/transactions')
     revalidatePath('/dashboard')
-    revalidatePath('/reports')
+    revalidatePath('/accounts')
     return { success: true }
   } catch (err) {
     console.error(err)
@@ -118,27 +133,26 @@ export async function deleteTransactionAction(transactionId: string) {
   const memberId = await getActiveMemberId()
   if (!memberId) return { error: 'Tidak ada profil aktif' }
 
-  const [member] = await db
-    .select()
-    .from(members)
-    .where(eq(members.id, memberId))
-    .limit(1)
-
+  const [member] = await db.select().from(members).where(eq(members.id, memberId)).limit(1)
   if (!member) return { error: 'Member tidak ditemukan' }
 
   try {
-    await db
-      .delete(transactions)
-      .where(
-        and(
-          eq(transactions.id, transactionId),
-          eq(transactions.familyId, member.familyId)
-        )
-      )
+    const [oldTx] = await db.select().from(transactions).where(eq(transactions.id, transactionId)).limit(1)
+    if (oldTx && oldTx.accountId) {
+      // Kembalikan saldo dompet
+      const oldIsIncome = ['INCOME', 'LOAN_RECEIVE', 'ASSET_SALE'].includes(oldTx.type)
+      const revertChange = oldIsIncome 
+        ? sql`${accounts.currentBalance} - ${oldTx.amount}`
+        : sql`${accounts.currentBalance} + ${oldTx.amount}`
+      
+      await db.update(accounts).set({ currentBalance: revertChange }).where(eq(accounts.id, oldTx.accountId))
+    }
+
+    await db.delete(transactions).where(eq(transactions.id, transactionId))
 
     revalidatePath('/transactions')
     revalidatePath('/dashboard')
-    revalidatePath('/reports')
+    revalidatePath('/accounts')
     return { success: true }
   } catch (err) {
     console.error(err)

@@ -13,7 +13,8 @@
     "db:seed": "tsx --env-file=.env.local src/lib/db/seed.ts",
     "db:studio": "dotenvx run -f .env.local -- drizzle-kit studio",
     "db:push:prod": "dotenvx run -f .env.production -- drizzle-kit push",
-    "db:seed:prod": "dotenvx run -f .env.production -- tsx src/lib/db/seed.ts"
+    "db:seed:prod": "dotenvx run -f .env.production -- tsx src/lib/db/seed.ts",
+    "db:migrate:v2": "tsx --env-file=.env.local src/lib/db/migrate-v2.ts"
   },
 
   "dependencies": {

@@ -12,7 +12,7 @@ import {
 import { relations } from 'drizzle-orm'
 
 // ============================================
-// ENUMS
+// ENUMS (YANG BARU)
 // ============================================
 
 export const memberRoleEnum = pgEnum('member_role', [
@@ -23,33 +23,74 @@ export const memberRoleEnum = pgEnum('member_role', [
 ])
 
 export const categoryTypeEnum = pgEnum('category_type', [
-  'INCOME',      // Pemasukan
-  'EXPENSE',     // Pengeluaran rutin
-  'SAVING',      // Tabungan
-  'DEBT',        // Bayar hutang
-  'INVESTMENT',  // Investasi
-  'SOCIAL',      // Donasi/sosial
+  'INCOME',
+  'EXPENSE',
+  'SAVING',
+  'INVESTMENT',
+  'DEBT',
+  'SOCIAL',
 ])
 
 export const transactionTypeEnum = pgEnum('transaction_type', [
-  'INCOME',    // Uang masuk
-  'EXPENSE',   // Uang keluar
-  'TRANSFER',  // Pindah antar pos
+  'INCOME',       // Pemasukan riil
+  'EXPENSE',      // Pengeluaran riil (konsumsi, bunga)
+  'TRANSFER',     // Pindah pos (Nabung, Beli Aset, Bayar Pokok)
+  'LOAN_RECEIVE', // Terima pinjaman
+  'ASSET_SALE',   // Jual aset
 ])
 
-export const planStatusEnum = pgEnum('plan_status', [
-  'PENDING',
-  'APPROVED',
-  'REVISION',
-  'REJECTED',
-  'EXECUTED',
+export const accountTypeEnum = pgEnum('account_type', [
+  'CASH',
+  'BANK',
+  'EWALLET',
+])
+
+export const assetTypeEnum = pgEnum('asset_type', [
+  'VEHICLE',
+  'PROPERTY',
+  'GOLD',
+  'INVESTMENT',
+  'OTHER',
 ])
 
 // ============================================
-// TABLES
+// TABEL BARU: ACCOUNTS (DOMPET)
+// ============================================
+export const accounts = pgTable('accounts', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  familyId: uuid('family_id')
+    .notNull()
+    .references(() => families.id, { onDelete: 'cascade' }),
+  name: text('name').notNull(), // "BCA", "Dompet Suami"
+  type: accountTypeEnum('type').notNull().default('BANK'),
+  initialBalance: decimal('initial_balance', { precision: 15, scale: 2 }).notNull().default('0'),
+  currentBalance: decimal('current_balance', { precision: 15, scale: 2 }).notNull().default('0'),
+  isActive: boolean('is_active').default(true).notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+})
+
+// ============================================
+// TABEL BARU: ASSETS (ASET)
+// ============================================
+export const assets = pgTable('assets', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  familyId: uuid('family_id')
+    .notNull()
+    .references(() => families.id, { onDelete: 'cascade' }),
+  name: text('name').notNull(), // "Emas Antam", "Motor Vario"
+  type: assetTypeEnum('type').notNull().default('OTHER'),
+  purchaseValue: decimal('purchase_value', { precision: 15, scale: 2 }).notNull(),
+  currentValue: decimal('current_value', { precision: 15, scale: 2 }).notNull(),
+  purchaseDate: timestamp('purchase_date').defaultNow().notNull(),
+  isLiquid: boolean('is_liquid').default(false).notNull(), // Bisa cepat dijual?
+  isActive: boolean('is_active').default(true).notNull(),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+})
+
+// ============================================
+// TABEL UPDATE
 // ============================================
 
-// Akun login (1 akun shared untuk keluarga)
 export const users = pgTable('users', {
   id: uuid('id').defaultRandom().primaryKey(),
   email: text('email').notNull().unique(),
@@ -57,7 +98,6 @@ export const users = pgTable('users', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
 })
 
-// Keluarga
 export const families = pgTable('families', {
   id: uuid('id').defaultRandom().primaryKey(),
   name: text('name').notNull(),
@@ -65,7 +105,6 @@ export const families = pgTable('families', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
 })
 
-// Anggota keluarga (profil di dalam 1 akun)
 export const members = pgTable('members', {
   id: uuid('id').defaultRandom().primaryKey(),
   familyId: uuid('family_id')
@@ -80,7 +119,6 @@ export const members = pgTable('members', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
 })
 
-// Kategori / pos keuangan
 export const categories = pgTable('categories', {
   id: uuid('id').defaultRandom().primaryKey(),
   familyId: uuid('family_id')
@@ -95,7 +133,6 @@ export const categories = pgTable('categories', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
 })
 
-// Alokasi per bulan per kategori
 export const allocations = pgTable(
   'allocations',
   {
@@ -115,7 +152,6 @@ export const allocations = pgTable(
   })
 )
 
-// Transaksi
 export const transactions = pgTable('transactions', {
   id: uuid('id').defaultRandom().primaryKey(),
   familyId: uuid('family_id')
@@ -127,6 +163,10 @@ export const transactions = pgTable('transactions', {
   memberId: uuid('member_id')
     .notNull()
     .references(() => members.id),
+  accountId: uuid('account_id') // Dompet sumber/utama
+    .references(() => accounts.id),
+  targetAccountId: uuid('target_account_id') // Untuk transfer antar dompet
+    .references(() => accounts.id),
   amount: decimal('amount', { precision: 15, scale: 2 }).notNull(),
   type: transactionTypeEnum('type').notNull(),
   description: text('description'),
@@ -135,36 +175,29 @@ export const transactions = pgTable('transactions', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
 })
 
-// Hutang
 export const debts = pgTable('debts', {
   id: uuid('id').defaultRandom().primaryKey(),
   familyId: uuid('family_id')
     .notNull()
     .references(() => families.id, { onDelete: 'cascade' }),
   name: text('name').notNull(),
-  totalAmount: decimal('total_amount', { precision: 15, scale: 2 }).notNull(),
-  remaining: decimal('remaining', { precision: 15, scale: 2 }).notNull(),
-  monthlyPayment: decimal('monthly_payment', {
-    precision: 15,
-    scale: 2,
-  }).notNull(),
-  dueDate: integer('due_date'),
+  principalAmount: decimal('principal_amount', { precision: 15, scale: 2 }).notNull(),
+  remainingPrincipal: decimal('remaining_principal', { precision: 15, scale: 2 }).notNull(),
   interestRate: decimal('interest_rate', { precision: 5, scale: 2 }),
+  startDate: timestamp('start_date').defaultNow().notNull(),
+  tenorMonths: integer('tenor_months'),
+  dueDate: integer('due_date'),
   isActive: boolean('is_active').default(true).notNull(),
   createdAt: timestamp('created_at').defaultNow().notNull(),
 })
 
-// Target tabungan
 export const savingsGoals = pgTable('savings_goals', {
   id: uuid('id').defaultRandom().primaryKey(),
   familyId: uuid('family_id')
     .notNull()
     .references(() => families.id, { onDelete: 'cascade' }),
   name: text('name').notNull(),
-  targetAmount: decimal('target_amount', {
-    precision: 15,
-    scale: 2,
-  }).notNull(),
+  targetAmount: decimal('target_amount', { precision: 15, scale: 2 }).notNull(),
   currentAmount: decimal('current_amount', { precision: 15, scale: 2 })
     .default('0')
     .notNull(),
@@ -173,7 +206,6 @@ export const savingsGoals = pgTable('savings_goals', {
   createdAt: timestamp('created_at').defaultNow().notNull(),
 })
 
-// Rencana Transaksi dengan approval
 export const transactionPlans = pgTable('transaction_plans', {
   id: uuid('id').defaultRandom().primaryKey(),
   familyId: uuid('family_id')
@@ -192,11 +224,9 @@ export const transactionPlans = pgTable('transaction_plans', {
   type: transactionTypeEnum('type').notNull(),
   description: text('description'),
   plannedDate: timestamp('planned_date').notNull(),
-  status: planStatusEnum('status').default('PENDING').notNull(),
-  // Untuk review
+  status: text('status').default('PENDING').notNull(), // PENDING, APPROVED, REVISION, REJECTED, EXECUTED
   reviewNote: text('review_note'),
   reviewedAt: timestamp('reviewed_at'),
-  // Kalau sudah dieksekusi, link ke transaksi
   executedTransactionId: uuid('executed_transaction_id').references(
     () => transactions.id,
     { onDelete: 'set null' }
@@ -206,115 +236,53 @@ export const transactionPlans = pgTable('transaction_plans', {
 })
 
 // ============================================
-// RELATIONS
+// RELATIONS (TAMBAHAN)
 // ============================================
 
+export const accountsRelations = relations(accounts, ({ one, many }) => ({
+  family: one(families, { fields: [accounts.familyId], references: [families.id] }),
+  transactions: many(transactions),
+}))
+
+export const assetsRelations = relations(assets, ({ one }) => ({
+  family: one(families, { fields: [assets.familyId], references: [families.id] }),
+}))
+
+// ... (Relations lain biarkan sama seperti sebelumnya)
 export const familiesRelations = relations(families, ({ many }) => ({
   members: many(members),
   categories: many(categories),
   transactions: many(transactions),
   debts: many(debts),
   savingsGoals: many(savingsGoals),
-}))
-
-export const membersRelations = relations(members, ({ one, many }) => ({
-  family: one(families, {
-    fields: [members.familyId],
-    references: [families.id],
-  }),
-  transactions: many(transactions),
-}))
-
-export const categoriesRelations = relations(categories, ({ one, many }) => ({
-  family: one(families, {
-    fields: [categories.familyId],
-    references: [families.id],
-  }),
-  transactions: many(transactions),
-  allocations: many(allocations),
+  accounts: many(accounts),
+  assets: many(assets),
 }))
 
 export const transactionsRelations = relations(transactions, ({ one }) => ({
-  family: one(families, {
-    fields: [transactions.familyId],
-    references: [families.id],
-  }),
-  category: one(categories, {
-    fields: [transactions.categoryId],
-    references: [categories.id],
-    relationName: 'transactionCategory',
-  }),
-  member: one(members, {
-    fields: [transactions.memberId],
-    references: [members.id],
-  }),
+  family: one(families, { fields: [transactions.familyId], references: [families.id] }),
+  category: one(categories, { fields: [transactions.categoryId], references: [categories.id], relationName: 'transactionCategory' }),
+  member: one(members, { fields: [transactions.memberId], references: [members.id] }),
+  account: one(accounts, { fields: [transactions.accountId], references: [accounts.id], relationName: 'sourceAccount' }),
+  targetAccount: one(accounts, { fields: [transactions.targetAccountId], references: [accounts.id], relationName: 'targetAccount' }),
 }))
-
-export const allocationsRelations = relations(allocations, ({ one }) => ({
-  category: one(categories, {
-    fields: [allocations.categoryId],
-    references: [categories.id],
-  }),
-}))
-
-export const debtsRelations = relations(debts, ({ one }) => ({
-  family: one(families, {
-    fields: [debts.familyId],
-    references: [families.id],
-  }),
-}))
-
-export const savingsGoalsRelations = relations(savingsGoals, ({ one }) => ({
-  family: one(families, {
-    fields: [savingsGoals.familyId],
-    references: [families.id],
-  }),
-}))
-
-export const transactionPlansRelations = relations(
-  transactionPlans,
-  ({ one }) => ({
-    family: one(families, {
-      fields: [transactionPlans.familyId],
-      references: [families.id],
-    }),
-    category: one(categories, {
-      fields: [transactionPlans.categoryId],
-      references: [categories.id],
-    }),
-    creator: one(members, {
-      fields: [transactionPlans.creatorId],
-      references: [members.id],
-      relationName: 'planCreator',
-    }),
-    reviewer: one(members, {
-      fields: [transactionPlans.reviewerId],
-      references: [members.id],
-      relationName: 'planReviewer',
-    }),
-  })
-)
-
 
 // ============================================
 // TYPES (infer dari schema)
 // ============================================
 
 export type User = typeof users.$inferSelect
-export type NewUser = typeof users.$inferInsert
 export type Family = typeof families.$inferSelect
-export type NewFamily = typeof families.$inferInsert
 export type Member = typeof members.$inferSelect
-export type NewMember = typeof members.$inferInsert
 export type Category = typeof categories.$inferSelect
-export type NewCategory = typeof categories.$inferInsert
 export type Transaction = typeof transactions.$inferSelect
-export type NewTransaction = typeof transactions.$inferInsert
 export type Debt = typeof debts.$inferSelect
-export type NewDebt = typeof debts.$inferInsert
 export type SavingsGoal = typeof savingsGoals.$inferSelect
-export type NewSavingsGoal = typeof savingsGoals.$inferInsert
 export type Allocation = typeof allocations.$inferSelect
-export type NewAllocation = typeof allocations.$inferInsert
 export type TransactionPlan = typeof transactionPlans.$inferSelect
-export type NewTransactionPlan = typeof transactionPlans.$inferInsert
+
+// 👇 Tambahkan dua baris ini untuk Dompet & Aset
+export type Account = typeof accounts.$inferSelect
+export type NewAccount = typeof accounts.$inferInsert
+export type Asset = typeof assets.$inferSelect
+export type NewAsset = typeof assets.$inferInsert
