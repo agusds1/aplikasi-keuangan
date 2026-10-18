@@ -36,7 +36,9 @@ export function DebtPlanSheet({ debt, accounts, open, onOpenChange, onSuccess }:
   // Hitung default
   const cicilanPokok = Math.round(principalAwal / tenor)
   const defaultPokok = Math.min(cicilanPokok, remaining)
-  const defaultBunga = Math.round(principalAwal * (interestRate / 100))
+  const defaultBunga = debt.interestType === 'FIXED' 
+    ? parseFloat(debt.interestAmount || '0') 
+    : Math.round(principalAwal * (interestRate / 100))
   
   const [principal, setPrincipal] = useState(defaultPokok.toString())
   const [interest, setInterest] = useState(defaultBunga.toString())

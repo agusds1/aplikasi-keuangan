@@ -11,6 +11,8 @@ const debtSchema = z.object({
   name: z.string().min(1, 'Nama hutang wajib diisi'),
   principalAmount: z.coerce.number().positive(),
   interestRate: z.coerce.number().min(0).default(0),
+  interestType: z.enum(['PERCENTAGE', 'FIXED']).default('PERCENTAGE'), // <-- BARU
+  interestAmount: z.coerce.number().min(0).default(0), // <-- BARU
   tenorMonths: z.coerce.number().min(1),
   accountId: z.string().uuid('Pilih dompet penerima'),
 })
@@ -19,6 +21,8 @@ export async function createDebtAction(input: {
   name: string
   principalAmount: number
   interestRate: number
+  interestType: 'PERCENTAGE' | 'FIXED' // <-- BARU
+  interestAmount: number // <-- BARU
   tenorMonths: number
   accountId: string
 }) {
@@ -38,8 +42,10 @@ export async function createDebtAction(input: {
       memberId: member.id,
       name: parsed.data.name,
       principalAmount: parsed.data.principalAmount.toString(),
-      remainingPrincipal: parsed.data.principalAmount.toString(), // Awalnya sisa = pokok
+      remainingPrincipal: parsed.data.principalAmount.toString(),
       interestRate: parsed.data.interestRate.toString(),
+      interestType: parsed.data.interestType, // <-- BARU
+      interestAmount: parsed.data.interestAmount.toString(), // <-- BARU
       tenorMonths: parsed.data.tenorMonths,
     })
 

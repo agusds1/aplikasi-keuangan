@@ -26,6 +26,8 @@ export function DebtFormSheet({ open, onOpenChange, accounts, onSuccess }: Props
   const [interest, setInterest] = useState('0')
   const [tenor, setTenor] = useState('')
   const [accountId, setAccountId] = useState(accounts[0]?.id || '')
+  const [interestType, setInterestType] = useState<'PERCENTAGE' | 'FIXED'>('PERCENTAGE')
+  const [interestAmount, setInterestAmount] = useState('')
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
@@ -35,6 +37,8 @@ export function DebtFormSheet({ open, onOpenChange, accounts, onSuccess }: Props
       name,
       principalAmount: Number(principal),
       interestRate: Number(interest),
+      interestType, // <-- BARU
+      interestAmount: Number(interestAmount), // <-- BARU
       tenorMonths: Number(tenor),
       accountId,
     })
@@ -60,16 +64,37 @@ export function DebtFormSheet({ open, onOpenChange, accounts, onSuccess }: Props
             <Label>Nominal Pinjaman (Pokok)</Label>
             <CurrencyInput value={principal} onChange={setPrincipal} required />
           </div>
-          <div className="grid grid-cols-2 gap-2">
-            <div className="space-y-2">
-              <Label>Bunga per Bulan (%)</Label>
-              <Input type="number" value={interest} onChange={(e) => setInterest(e.target.value)} required />
+          
+                    <div className="space-y-2">
+            <Label>Tipe Bunga</Label>
+            <div className="grid grid-cols-2 gap-2">
+              <Button type="button" variant={interestType === 'PERCENTAGE' ? 'default' : 'outline'} onClick={() => setInterestType('PERCENTAGE')}>
+                Persentase (%)
+              </Button>
+              <Button type="button" variant={interestType === 'FIXED' ? 'default' : 'outline'} onClick={() => setInterestType('FIXED')}>
+                Nominal (Rp)
+              </Button>
             </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2">
+            {interestType === 'PERCENTAGE' ? (
+              <div className="space-y-2">
+                <Label>Bunga per Bulan (%)</Label>
+                <Input type="number" value={interest} onChange={(e) => setInterest(e.target.value)} required />
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <Label>Bunga per Bulan (Rp)</Label>
+                <CurrencyInput value={interestAmount} onChange={setInterestAmount} required />
+              </div>
+            )}
             <div className="space-y-2">
               <Label>Tenor (Bulan)</Label>
               <Input type="number" value={tenor} onChange={(e) => setTenor(e.target.value)} placeholder="12" required />
             </div>
           </div>
+
           <div className="space-y-2">
             <Label>Masuk ke Dompet Mana?</Label>
             <select value={accountId} onChange={(e) => setAccountId(e.target.value)} className="w-full h-10 px-3 rounded-md border border-input bg-background text-sm" required>

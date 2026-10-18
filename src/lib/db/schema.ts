@@ -186,6 +186,8 @@ export const debts = pgTable('debts', {
   principalAmount: decimal('principal_amount', { precision: 15, scale: 2 }).notNull(),
   remainingPrincipal: decimal('remaining_principal', { precision: 15, scale: 2 }).notNull(),
   interestRate: decimal('interest_rate', { precision: 5, scale: 2 }),
+  interestType: text('interest_type').default('PERCENTAGE').notNull(),
+  interestAmount: decimal('interest_amount', { precision: 15, scale: 2 }).default('0').notNull(),
   startDate: timestamp('start_date').defaultNow().notNull(),
   tenorMonths: integer('tenor_months'),
   dueDate: integer('due_date'),
