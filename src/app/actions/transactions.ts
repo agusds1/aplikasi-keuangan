@@ -167,6 +167,7 @@ export async function transferAction(input: {
   fromAccountId: string
   toAccountId: string
   amount: number
+  categoryId: string 
   description?: string
   date: string
 }) {
@@ -204,7 +205,7 @@ export async function transferAction(input: {
 
     await db.insert(transactions).values({
       familyId: member.familyId,
-      categoryId: catMutasi.id,
+      categoryId: input.categoryId,
       accountId: input.fromAccountId, // Sumber dana
       targetAccountId: input.toAccountId, // Tujuan
       memberId: member.id,

@@ -35,7 +35,7 @@ export default async function TransactionsPage() {
       )}
 
       {/* DUA TOMBOL FLOATING ACTION DI SINI */}
-      <TransferFormSheet accounts={accounts} />
+      <TransferFormSheet accounts={accounts} categories={categories} />
       <TransactionFormSheet categories={categories} accounts={accounts} />
     </div>
   )
