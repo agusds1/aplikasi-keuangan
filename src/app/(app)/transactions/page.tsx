@@ -5,6 +5,7 @@ import { eq } from 'drizzle-orm'
 import { getCategoriesByFamily, getRecentTransactions, getAccountsByFamily } from '@/lib/db/queries'
 import { TransactionFormSheet } from '@/components/transactions/transaction-form-sheet'
 import { TransactionList } from '@/components/transactions/transaction-list'
+import { TransferFormSheet } from '@/components/transactions/transfer-form-sheet' // <-- Import Form Transfer
 
 export default async function TransactionsPage() {
   const activeMemberId = await getActiveMemberId()
@@ -33,6 +34,8 @@ export default async function TransactionsPage() {
         <TransactionList transactions={txList as any} categories={categories} accounts={accounts} />
       )}
 
+      {/* DUA TOMBOL FLOATING ACTION DI SINI */}
+      <TransferFormSheet accounts={accounts} />
       <TransactionFormSheet categories={categories} accounts={accounts} />
     </div>
   )

@@ -1,5 +1,5 @@
 import { db } from './index'
-import { categories, members, transactions, accounts, debts, transactionPlans, assets } from './schema'
+import { categories, members, transactions, accounts, debts, transactionPlans, assets, debtPlans } from './schema'
 import { and, desc, eq, inArray, ne, or, gte, lte } from 'drizzle-orm'
 
 
@@ -222,18 +222,28 @@ export async function getAccountsByFamily(familyId: string) {
 
 export async function getDebtsByFamily(familyId: string) {
   return db
-    .select()
+    .select({
+      debt: debts,
+      memberName: members.name, // Ambil nama asli
+    })
     .from(debts)
+    .innerJoin(members, eq(debts.memberId, members.id))
     .where(and(eq(debts.familyId, familyId), eq(debts.isActive, true)))
     .orderBy(desc(debts.createdAt))
+    .then(res => res.map(r => ({ ...r.debt, memberName: r.memberName })))
 }
 
 export async function getAssetsByFamily(familyId: string) {
   return db
-    .select()
+    .select({
+      asset: assets,
+      memberName: members.name, // Ambil nama asli
+    })
     .from(assets)
+    .innerJoin(members, eq(assets.memberId, members.id))
     .where(and(eq(assets.familyId, familyId), eq(assets.isActive, true)))
     .orderBy(desc(assets.createdAt))
+    .then(res => res.map(r => ({ ...r.asset, memberName: r.memberName })))
 }
 
 export async function getNetWorthData(familyId: string) {
@@ -255,4 +265,24 @@ export async function getNetWorthData(familyId: string) {
     totalDebts,
     netWorth: totalCash + totalAssets - totalDebts
   }
+}
+
+
+// Ambil semua Rencana Pelunasan untuk sebuah Hutang
+export async function getDebtPlansByDebt(debtId: string) {
+  return db.select().from(debtPlans).where(eq(debtPlans.debtId, debtId)).orderBy(debtPlans.installmentNumber)
+}
+
+// Ambil semua Rencana Pelunasan untuk Menu Rencana (Approval)
+export async function getDebtPlansForApproval(familyId: string) {
+  return db
+    .select({
+      plan: debtPlans,
+      debtName: debts.name,
+      creator: { name: members.name, avatar: members.avatar }
+    })
+    .from(debtPlans)
+    .innerJoin(debts, eq(debtPlans.debtId, debts.id))
+    .innerJoin(members, eq(debtPlans.creatorId, members.id))
+    .where(and(eq(debtPlans.familyId, familyId), eq(debtPlans.status, 'PENDING')))
 }

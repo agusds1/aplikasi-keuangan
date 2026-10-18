@@ -32,6 +32,7 @@ export async function createAssetAction(input: {
     // 1. Simpan Aset
     await db.insert(assets).values({
       familyId: member.familyId,
+      memberId: member.id,
       name: parsed.data.name,
       type: parsed.data.type,
       purchaseValue: parsed.data.purchaseValue.toString(),

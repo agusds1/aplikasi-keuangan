@@ -27,6 +27,7 @@ import {
 } from '@/app/actions/transactions'
 import { cn } from '@/lib/utils'
 import { CurrencyInput } from '@/components/ui/currency-input'
+import { formatCurrency } from '@/lib/format'
 
 type TransactionData = {
   id: string
@@ -219,7 +220,7 @@ export function TransactionActionSheet({
                   >
                     {accounts.map((acc) => (
                       <option key={acc.id} value={acc.id}>
-                        {acc.name}
+                        {acc.name} ({formatCurrency(acc.currentBalance)})
                       </option>
                     ))}
                   </select>

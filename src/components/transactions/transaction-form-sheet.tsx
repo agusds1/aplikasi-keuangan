@@ -15,7 +15,8 @@ import { Plus, Loader2 } from 'lucide-react'
 import { createTransactionAction } from '@/app/actions/transactions'
 import type { Category, Account } from '@/lib/db/schema'
 import { cn } from '@/lib/utils'
-import { CurrencyInput } from '@/components/ui/currency-input'
+import { formatCurrency } from '@/lib/format'
+import { CurrencyInput } from '@/components/ui/currency-input' // <-- Import CurrencyInput
 
 type Props = {
   categories: Category[]
@@ -29,6 +30,8 @@ export function TransactionFormSheet({ categories, accounts }: Props) {
   const [selectedType, setSelectedType] = useState<'EXPENSE' | 'INCOME'>('EXPENSE')
   const [selectedCategoryId, setSelectedCategoryId] = useState<string | null>(null)
   const [selectedAccountId, setSelectedAccountId] = useState<string | null>(accounts[0]?.id || null)
+  
+  // State untuk amount
   const [amount, setAmount] = useState('')
 
   const filteredCategories = categories.filter((c) => {
@@ -42,6 +45,7 @@ export function TransactionFormSheet({ categories, accounts }: Props) {
 
     if (!selectedCategoryId) return setError('Pilih kategori dulu')
     if (!selectedAccountId) return setError('Pilih dompet dulu')
+    if (!amount) return setError('Nominal tidak boleh kosong')
 
     setLoading(true)
     const formData = new FormData(e.currentTarget)
@@ -50,7 +54,7 @@ export function TransactionFormSheet({ categories, accounts }: Props) {
       categoryId: selectedCategoryId,
       accountId: selectedAccountId,
       type: selectedType,
-      amount: Number(amount),
+      amount: Number(amount), // <-- Pakai state amount
       description: (formData.get('description') as string) || undefined,
       date: new Date().toISOString(),
     })
@@ -62,6 +66,7 @@ export function TransactionFormSheet({ categories, accounts }: Props) {
     }
 
     setSelectedCategoryId(null)
+    setAmount('')
     setOpen(false)
     setLoading(false)
     ;(e.target as HTMLFormElement).reset()
@@ -85,9 +90,9 @@ export function TransactionFormSheet({ categories, accounts }: Props) {
 
           <div className="space-y-2">
             <Label htmlFor="amount">Nominal</Label>
+            {/* Ganti Input Biasa dengan CurrencyInput */}
             <CurrencyInput
               id="amount"
-              placeholder="0"
               value={amount}
               onChange={setAmount}
               className="text-lg font-semibold"
@@ -103,7 +108,9 @@ export function TransactionFormSheet({ categories, accounts }: Props) {
               required
             >
               {accounts.map((acc) => (
-                <option key={acc.id} value={acc.id}>{acc.name}</option>
+                <option key={acc.id} value={acc.id}>
+                  {acc.name} ({formatCurrency(acc.currentBalance)})
+                </option>
               ))}
             </select>
           </div>

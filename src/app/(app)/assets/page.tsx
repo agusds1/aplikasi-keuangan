@@ -26,7 +26,7 @@ export default async function AssetsPage() {
         </p>
       </div>
 
-      <AssetList assets={assets} accounts={accounts} />
+      <AssetList assets={assets} accounts={accounts} activeMemberId={activeMemberId!} />
     </div>
   )
 }

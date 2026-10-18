@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache'
 import { db } from '@/lib/db'
-import { transactions, members, accounts } from '@/lib/db/schema'
+import { transactions, members, accounts, categories } from '@/lib/db/schema'
 import { getActiveMemberId, getCurrentUser } from '@/lib/auth/session'
 import { eq, and, sql } from 'drizzle-orm'
 import { z } from 'zod'
@@ -157,5 +157,69 @@ export async function deleteTransactionAction(transactionId: string) {
   } catch (err) {
     console.error(err)
     return { error: 'Gagal menghapus transaksi' }
+  }
+}
+
+// ============================================
+// FUNGSI TRANSFER ANTAR DOMPET
+// ============================================
+export async function transferAction(input: {
+  fromAccountId: string
+  toAccountId: string
+  amount: number
+  description?: string
+  date: string
+}) {
+  const memberId = await getActiveMemberId()
+  if (!memberId) return { error: 'Tidak ada profil aktif' }
+
+  const [member] = await db.select().from(members).where(eq(members.id, memberId)).limit(1)
+  if (!member) return { error: 'Member tidak ditemukan' }
+
+  if (input.fromAccountId === input.toAccountId) {
+    return { error: 'Dompet asal dan tujuan tidak boleh sama' }
+  }
+  if (input.amount <= 0) return { error: 'Nominal tidak valid' }
+
+  try {
+    // 1. Potong saldo dompet asal
+    await db.update(accounts)
+      .set({ currentBalance: sql`${accounts.currentBalance} - ${input.amount}` })
+      .where(eq(accounts.id, input.fromAccountId))
+
+    // 2. Tambah saldo dompet tujuan
+    await db.update(accounts)
+      .set({ currentBalance: sql`${accounts.currentBalance} + ${input.amount}` })
+      .where(eq(accounts.id, input.toAccountId))
+
+    // 3. Catat transaksi (Tanpa kategori, karena ini murni mutasi)
+    // Kita gunakan kategori dummy atau kategori khusus "Mutasi"
+    let [catMutasi] = await db.select().from(categories).where(eq(categories.name, 'Mutasi Dompet')).limit(1)
+    if (!catMutasi) {
+      const [newCat] = await db.insert(categories).values({
+        familyId: member.familyId, name: 'Mutasi Dompet', type: 'SAVING', icon: '🔄'
+      }).returning()
+      catMutasi = newCat
+    }
+
+    await db.insert(transactions).values({
+      familyId: member.familyId,
+      categoryId: catMutasi.id,
+      accountId: input.fromAccountId, // Sumber dana
+      targetAccountId: input.toAccountId, // Tujuan
+      memberId: member.id,
+      amount: input.amount.toString(),
+      type: 'TRANSFER',
+      description: input.description || 'Transfer antar dompet',
+      date: new Date(input.date),
+    })
+
+    revalidatePath('/transactions')
+    revalidatePath('/accounts')
+    revalidatePath('/dashboard')
+    return { success: true }
+  } catch (err) {
+    console.error(err)
+    return { error: 'Gagal melakukan transfer' }
   }
 }

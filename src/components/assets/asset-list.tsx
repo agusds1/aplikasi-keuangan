@@ -11,19 +11,13 @@ import { AssetFormSheet } from './asset-form-sheet'
 import { SellAssetSheet } from './sell-asset-sheet'
 import { deleteAssetAction } from '@/app/actions/assets'
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 
 type Asset = any
 
-export function AssetList({ assets, accounts }: { assets: Asset[]; accounts: Account[] }) {
+export function AssetList({ assets, accounts, activeMemberId }: { assets: Asset[]; accounts: Account[]; activeMemberId: string }) {
   const router = useRouter()
   const [showCreate, setShowCreate] = useState(false)
   const [sellingAsset, setSellingAsset] = useState<Asset | null>(null)
@@ -36,10 +30,7 @@ export function AssetList({ assets, accounts }: { assets: Asset[]; accounts: Acc
     if (!deletingAsset) return
     setError(null)
     const res = await deleteAssetAction(deletingAsset.id)
-    if (res.error) {
-      setError(res.error)
-      return
-    }
+    if (res.error) { setError(res.error); return }
     setDeletingAsset(null)
     handleRefresh()
   }
@@ -69,35 +60,48 @@ export function AssetList({ assets, accounts }: { assets: Asset[]; accounts: Acc
         </div>
       ) : (
         <div className="space-y-3">
-          {assets.map((asset) => (
-            <Card key={asset.id}>
-              <CardContent className="p-4 space-y-3">
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center text-lg">
-                      {getIcon(asset.type)}
-                    </div>
-                    <div>
-                      <p className="font-bold">{asset.name}</p>
-                      <p className="text-[10px] text-muted-foreground capitalize">{asset.type.toLowerCase()}</p>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <p className="text-sm font-bold text-green-600">{formatCurrency(asset.currentValue)}</p>
-                    <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive" onClick={() => setDeletingAsset(asset)}>
-                      <Trash2 className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </div>
+          {assets.map((asset) => {
+            const isOwner = asset.memberId === activeMemberId
 
-                <div className="flex gap-2">
-                  <Button size="sm" variant="outline" className="flex-1" onClick={() => setSellingAsset(asset)}>
-                    <ArrowRightLeft className="mr-1 h-3.5 w-3.5" /> Jual Aset
-                  </Button>
-                </div>
-              </CardContent>
-            </Card>
-          ))}
+            return (
+              <Card key={asset.id}>
+                <CardContent className="p-4 space-y-3">
+                  <div className="flex items-start justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-full bg-muted flex items-center justify-center text-lg">
+                        {getIcon(asset.type)}
+                      </div>
+                      <div>
+                        <p className="font-bold flex items-center gap-2">
+                          {asset.name}
+                          <span className="text-[10px] font-normal px-1.5 py-0.5 bg-muted rounded text-muted-foreground">
+                            {asset.memberName} {/* TAMPILKAN NAMA ASLI */}
+                          </span>
+                        </p>
+                        <p className="text-[10px] text-muted-foreground capitalize">{asset.type.toLowerCase()}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <p className="text-sm font-bold text-green-600">{formatCurrency(asset.currentValue)}</p>
+                      {isOwner && (
+                        <Button size="icon" variant="ghost" className="h-8 w-8 text-destructive" onClick={() => setDeletingAsset(asset)}>
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
+                    </div>
+                  </div>
+
+                  {isOwner && (
+                    <div className="flex gap-2">
+                      <Button size="sm" variant="outline" className="flex-1" onClick={() => setSellingAsset(asset)}>
+                        <ArrowRightLeft className="mr-1 h-3.5 w-3.5" /> Jual Aset
+                      </Button>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            )
+          })}
         </div>
       )}
 
@@ -108,15 +112,11 @@ export function AssetList({ assets, accounts }: { assets: Asset[]; accounts: Acc
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Hapus Aset?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Data aset <strong>{deletingAsset?.name}</strong> akan dihapus. (Catatan: Jika kamu salah input pembelian, hapus juga transaksinya secara manual di menu Transaksi).
-            </AlertDialogDescription>
+            <AlertDialogDescription>Data aset <strong>{deletingAsset?.name}</strong> akan dihapus.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Batal</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-white hover:bg-destructive/90">
-              Hapus
-            </AlertDialogAction>
+            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-white hover:bg-destructive/90">Hapus</AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>

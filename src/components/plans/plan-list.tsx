@@ -30,6 +30,7 @@ export function PlanList({
             ...row.plan,
             category: row.category,
             creator: row.creator,
+            isDebtPlan: row.isDebtPlan, // <-- INI KUNCI PERBAIKANNYA (Meneruskan data isDebtPlan)
           }}
           activeMemberId={activeMemberId}
           categories={categories}

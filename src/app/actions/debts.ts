@@ -35,6 +35,7 @@ export async function createDebtAction(input: {
     // 1. Simpan data hutang
     await db.insert(debts).values({
       familyId: member.familyId,
+      memberId: member.id,
       name: parsed.data.name,
       principalAmount: parsed.data.principalAmount.toString(),
       remainingPrincipal: parsed.data.principalAmount.toString(), // Awalnya sisa = pokok

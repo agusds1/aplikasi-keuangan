@@ -9,6 +9,7 @@ import { Loader2 } from 'lucide-react'
 import { createAssetAction } from '@/app/actions/assets'
 import { CurrencyInput } from '@/components/ui/currency-input'
 import type { Account } from '@/lib/db/schema'
+import { formatCurrency } from '@/lib/format'
 
 type Props = {
   open: boolean
@@ -73,7 +74,7 @@ export function AssetFormSheet({ open, onOpenChange, accounts, onSuccess }: Prop
           <div className="space-y-2">
             <Label>Bayar dari Dompet</Label>
             <select value={accountId} onChange={(e) => setAccountId(e.target.value)} className="w-full h-10 px-3 rounded-md border border-input bg-background text-sm" required>
-              {accounts.map((acc) => <option key={acc.id} value={acc.id}>{acc.name}</option>)}
+              {accounts.map((acc) => <option key={acc.id} value={acc.id}>{acc.name} ({formatCurrency(acc.currentBalance)})</option>)}
             </select>
           </div>
 

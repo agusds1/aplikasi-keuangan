@@ -13,7 +13,7 @@ import { SummaryCardsWrapper } from '@/components/dashboard/summary-cards-wrappe
 import { CategoryProgress } from '@/components/dashboard/category-progress'
 import { MemberBreakdown } from '@/components/dashboard/member-breakdown'
 import { PlanRecapCard } from '@/components/dashboard/plan-recap-card'
-import { getActivePlans, getPendingPlansCount, getNetWorthData } from '@/lib/db/queries'
+import { getActivePlans, getPendingPlansCount, getNetWorthData, getDebtPlansForApproval } from '@/lib/db/queries'
 import { format } from 'date-fns'
 import { id as idLocale } from 'date-fns/locale'
 import Link from 'next/link'
@@ -53,6 +53,7 @@ export default async function DashboardPage({
     memberBreakdown,
     activePlans,
     pendingPlans,
+    debtPlans,
     netWorthData,
   ] = await Promise.all([
     getIncomeSummary(getRangeDates(incomeRange)),
@@ -62,11 +63,19 @@ export default async function DashboardPage({
     getMemberBreakdown(activeMember.familyId),
     getActivePlans(activeMember.familyId),
     getPendingPlansCount(activeMember.familyId, activeMemberId!),
+    getDebtPlansForApproval(activeMember.familyId), // Ambil Rencana Hutang
     getNetWorthData(activeMember.familyId),
   ])
 
+  // HITUNG NOTIFIKASI HUTANG: Hanya hitung yang BUKAN dibuat oleh diri sendiri
+  const pendingDebtPlansForMe = debtPlans.filter(
+    (dp) => dp.plan.creatorId !== activeMemberId
+  )
+
+  // Total notifikasi = Rencana Biasa + Rencana Hutang milik pasangan
+  const totalPending = pendingPlans + pendingDebtPlansForMe.length
+
   return (
-    // UBAH space-y-6 MENJADI space-y-3 AGAR SERAGAM
     <div className="space-y-3 pb-6">
       
       {/* Greeting */}
@@ -87,8 +96,8 @@ export default async function DashboardPage({
         netWorth={netWorthData.netWorth}
       />
 
-      {/* Alert Rencana Menunggu Persetujuan (Card Notifikasi) */}
-      {pendingPlans > 0 && (
+      {/* Alert Rencana Menunggu Persetujuan */}
+      {totalPending > 0 && (
         <Link href="/plans">
           <div className="rounded-xl bg-primary/5 border border-primary/20 p-4 flex items-center justify-between hover:bg-primary/10 transition-colors h-[72px]">
             <div className="flex items-center gap-3">
@@ -98,7 +107,7 @@ export default async function DashboardPage({
               <div>
                 <p className="text-sm font-semibold">Rencana Transaksi</p>
                 <p className="text-xs text-muted-foreground">
-                  {pendingPlans} transaksi menunggu persetujuan Anda
+                  {totalPending} transaksi menunggu persetujuan Anda
                 </p>
               </div>
             </div>

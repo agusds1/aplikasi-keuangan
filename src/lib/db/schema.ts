@@ -77,6 +77,7 @@ export const assets = pgTable('assets', {
   familyId: uuid('family_id')
     .notNull()
     .references(() => families.id, { onDelete: 'cascade' }),
+  memberId: uuid('member_id').notNull().references(() => members.id),
   name: text('name').notNull(), // "Emas Antam", "Motor Vario"
   type: assetTypeEnum('type').notNull().default('OTHER'),
   purchaseValue: decimal('purchase_value', { precision: 15, scale: 2 }).notNull(),
@@ -180,6 +181,7 @@ export const debts = pgTable('debts', {
   familyId: uuid('family_id')
     .notNull()
     .references(() => families.id, { onDelete: 'cascade' }),
+  memberId: uuid('member_id').notNull().references(() => members.id),
   name: text('name').notNull(),
   principalAmount: decimal('principal_amount', { precision: 15, scale: 2 }).notNull(),
   remainingPrincipal: decimal('remaining_principal', { precision: 15, scale: 2 }).notNull(),
@@ -266,6 +268,43 @@ export const transactionsRelations = relations(transactions, ({ one }) => ({
   account: one(accounts, { fields: [transactions.accountId], references: [accounts.id], relationName: 'sourceAccount' }),
   targetAccount: one(accounts, { fields: [transactions.targetAccountId], references: [accounts.id], relationName: 'targetAccount' }),
 }))
+
+// ============================================
+// TABEL BARU: DEBT PLANS (RENCANA PELUNASAN)
+// ============================================
+export const debtPlans = pgTable('debt_plans', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  familyId: uuid('family_id')
+    .notNull()
+    .references(() => families.id, { onDelete: 'cascade' }),
+  debtId: uuid('debt_id')
+    .notNull()
+    .references(() => debts.id, { onDelete: 'cascade' }),
+  creatorId: uuid('creator_id')
+    .notNull()
+    .references(() => members.id),
+  accountId: uuid('account_id')
+    .notNull()
+    .references(() => accounts.id),
+  installmentNumber: integer('installment_number').notNull(), // Rencana Pelunasan ke-1, ke-2, dst
+  principalPaid: decimal('principal_paid', { precision: 15, scale: 2 }).notNull(),
+  interestPaid: decimal('interest_paid', { precision: 15, scale: 2 }).notNull(),
+  plannedDate: timestamp('planned_date').notNull(),
+  status: text('status').default('PENDING').notNull(), // PENDING, APPROVED, PAID
+  reviewNote: text('review_note'),
+  reviewedAt: timestamp('reviewed_at'),
+  paidAt: timestamp('paid_at'),
+  createdAt: timestamp('created_at').defaultNow().notNull(),
+})
+
+export const debtPlansRelations = relations(debtPlans, ({ one }) => ({
+  family: one(families, { fields: [debtPlans.familyId], references: [families.id] }),
+  debt: one(debts, { fields: [debtPlans.debtId], references: [debts.id] }),
+  creator: one(members, { fields: [debtPlans.creatorId], references: [members.id] }),
+  account: one(accounts, { fields: [debtPlans.accountId], references: [accounts.id] }),
+}))
+
+export type DebtPlan = typeof debtPlans.$inferSelect
 
 // ============================================
 // TYPES (infer dari schema)

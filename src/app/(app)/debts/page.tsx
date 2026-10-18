@@ -2,7 +2,7 @@ import { getActiveMemberId } from '@/lib/auth/session'
 import { db } from '@/lib/db'
 import { members } from '@/lib/db/schema'
 import { eq } from 'drizzle-orm'
-import { getDebtsByFamily, getAccountsByFamily } from '@/lib/db/queries'
+import { getDebtsByFamily, getAccountsByFamily, getDebtPlansByDebt } from '@/lib/db/queries'
 import { DebtList } from '@/components/debts/debt-list'
 import { formatCurrency } from '@/lib/format'
 
@@ -15,6 +15,13 @@ export default async function DebtsPage() {
     getAccountsByFamily(member.familyId),
   ])
 
+  const debtsWithPlans = await Promise.all(
+    debts.map(async (debt) => ({
+      ...debt,
+      plans: await getDebtPlansByDebt(debt.id)
+    }))
+  )
+
   const totalDebt = debts.reduce((sum, d) => sum + parseFloat(d.remainingPrincipal), 0)
 
   return (
@@ -26,7 +33,7 @@ export default async function DebtsPage() {
         </p>
       </div>
 
-      <DebtList debts={debts} accounts={accounts} />
+      <DebtList debts={debtsWithPlans} accounts={accounts} activeMemberId={activeMemberId!} />
     </div>
   )
 }
