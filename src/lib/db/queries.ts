@@ -1,8 +1,6 @@
 import { db } from './index'
-import { categories, members, transactions, accounts } from './schema'
-import { transactionPlans } from './schema'
+import { categories, members, transactions, accounts, debts, transactionPlans, assets } from './schema'
 import { and, desc, eq, inArray, ne, or, gte, lte } from 'drizzle-orm'
-
 
 
 export async function getCategoriesByFamily(familyId: string) {
@@ -220,4 +218,41 @@ export async function getAccountsByFamily(familyId: string) {
     .from(accounts)
     .where(and(eq(accounts.familyId, familyId), eq(accounts.isActive, true)))
     .orderBy(accounts.createdAt)
+}
+
+export async function getDebtsByFamily(familyId: string) {
+  return db
+    .select()
+    .from(debts)
+    .where(and(eq(debts.familyId, familyId), eq(debts.isActive, true)))
+    .orderBy(desc(debts.createdAt))
+}
+
+export async function getAssetsByFamily(familyId: string) {
+  return db
+    .select()
+    .from(assets)
+    .where(and(eq(assets.familyId, familyId), eq(assets.isActive, true)))
+    .orderBy(desc(assets.createdAt))
+}
+
+export async function getNetWorthData(familyId: string) {
+  // 1. Ambil total saldo dompet
+  const accountsData = await db.select().from(accounts).where(eq(accounts.familyId, familyId))
+  const totalCash = accountsData.reduce((sum, a) => sum + parseFloat(a.currentBalance), 0)
+
+  // 2. Ambil total nilai aset
+  const assetsData = await db.select().from(assets).where(and(eq(assets.familyId, familyId), eq(assets.isActive, true)))
+  const totalAssets = assetsData.reduce((sum, a) => sum + parseFloat(a.currentValue), 0)
+
+  // 3. Ambil total sisa hutang
+  const debtsData = await db.select().from(debts).where(and(eq(debts.familyId, familyId), eq(debts.isActive, true)))
+  const totalDebts = debtsData.reduce((sum, d) => sum + parseFloat(d.remainingPrincipal), 0)
+
+  return {
+    totalCash,
+    totalAssets,
+    totalDebts,
+    netWorth: totalCash + totalAssets - totalDebts
+  }
 }

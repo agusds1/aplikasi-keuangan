@@ -21,12 +21,7 @@ export async function createAccountAction(input: {
   const memberId = await getActiveMemberId()
   if (!memberId) return { error: 'Tidak ada profil aktif' }
 
-  const [member] = await db
-    .select()
-    .from(members)
-    .where(eq(members.id, memberId))
-    .limit(1)
-
+  const [member] = await db.select().from(members).where(eq(members.id, memberId)).limit(1)
   if (!member) return { error: 'Member tidak ditemukan' }
 
   const parsed = accountSchema.safeParse(input)
@@ -51,48 +46,26 @@ export async function createAccountAction(input: {
 
 export async function updateAccountAction(
   accountId: string,
-  input: {
-    name: string
-    type: 'CASH' | 'BANK' | 'EWALLET'
-    initialBalance: number
-  }
+  input: { name: string; type: 'CASH' | 'BANK' | 'EWALLET'; initialBalance: number }
 ) {
   const memberId = await getActiveMemberId()
   if (!memberId) return { error: 'Tidak ada profil aktif' }
 
-  const [member] = await db
-    .select()
-    .from(members)
-    .where(eq(members.id, memberId))
-    .limit(1)
-
+  const [member] = await db.select().from(members).where(eq(members.id, memberId)).limit(1)
   if (!member) return { error: 'Member tidak ditemukan' }
 
   const parsed = accountSchema.safeParse(input)
   if (!parsed.success) return { error: parsed.error.issues[0].message }
 
   try {
-    const [oldAcc] = await db
-      .select()
-      .from(accounts)
-      .where(eq(accounts.id, accountId))
-      .limit(1)
-
-    if (!oldAcc) return { error: 'Dompet tidak ditemukan' }
-
-    // Hitung selisih saldo awal untuk menyesuaikan currentBalance
-    const diff = parsed.data.initialBalance - parseFloat(oldAcc.initialBalance)
-    const newCurrentBalance = parseFloat(oldAcc.currentBalance) + diff
-
-    await db
-      .update(accounts)
-      .set({
-        name: parsed.data.name,
-        type: parsed.data.type,
-        initialBalance: Math.round(parsed.data.initialBalance).toString(),
-        currentBalance: Math.round(newCurrentBalance).toString(),
-      })
-      .where(and(eq(accounts.id, accountId), eq(accounts.familyId, member.familyId)))
+    // KITA PAKSA SALDO SAAT INI = SALDO AWAL
+    // Ini agar jika ada minus nyangkut, bisa di-reset paksa lewat form edit
+    await db.update(accounts).set({
+      name: parsed.data.name,
+      type: parsed.data.type,
+      initialBalance: Math.round(parsed.data.initialBalance).toString(),
+      currentBalance: Math.round(parsed.data.initialBalance).toString(), 
+    }).where(and(eq(accounts.id, accountId), eq(accounts.familyId, member.familyId)))
 
     revalidatePath('/accounts')
     revalidatePath('/dashboard')
@@ -111,12 +84,23 @@ export async function deleteAccountAction(accountId: string) {
   if (!member) return { error: 'Member tidak ditemukan' }
 
   try {
-    // Cek apakah ada transaksi yang pakai dompet ini
+    const [acc] = await db.select().from(accounts).where(eq(accounts.id, accountId)).limit(1)
+    if (!acc) return { error: 'Dompet tidak ditemukan' }
+
+    // PENGAMAN 1: Cek apakah ada transaksi
     const txs = await db.select().from(transactions).where(eq(transactions.accountId, accountId)).limit(1)
-    if (txs.length > 0) return { error: 'Dompet masih dipakai di transaksi' }
+    if (txs.length > 0) {
+      return { error: 'Dompet tidak bisa dihapus karena sudah memiliki riwayat transaksi.' }
+    }
+
+    // PENGAMAN 2: Cek saldo harus 0
+    if (parseFloat(acc.currentBalance) !== 0) {
+      return { error: 'Dompet tidak bisa dihapus jika saldo belum 0. Silakan tarik/pindahkan saldonya dulu.' }
+    }
 
     await db.delete(accounts).where(and(eq(accounts.id, accountId), eq(accounts.familyId, member.familyId)))
     revalidatePath('/accounts')
+    revalidatePath('/dashboard')
     return { success: true }
   } catch (err) {
     console.error(err)

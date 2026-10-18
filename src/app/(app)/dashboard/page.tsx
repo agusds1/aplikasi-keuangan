@@ -13,12 +13,13 @@ import { SummaryCardsWrapper } from '@/components/dashboard/summary-cards-wrappe
 import { CategoryProgress } from '@/components/dashboard/category-progress'
 import { MemberBreakdown } from '@/components/dashboard/member-breakdown'
 import { PlanRecapCard } from '@/components/dashboard/plan-recap-card'
-import { getActivePlans, getPendingPlansCount } from '@/lib/db/queries'
+import { getActivePlans, getPendingPlansCount, getNetWorthData } from '@/lib/db/queries'
 import { format } from 'date-fns'
 import { id as idLocale } from 'date-fns/locale'
 import Link from 'next/link'
 import { ClipboardList, BarChart3 } from 'lucide-react'
 import { decodeRange, getRangeDates } from '@/lib/date-range'
+import { NetWorthCard } from '@/components/dashboard/net-worth-card'
 
 type SearchParams = Promise<{
   income?: string
@@ -45,7 +46,7 @@ export default async function DashboardPage({
   const expenseRange = decodeRange(params.expense)
   const savingRange = decodeRange(params.saving)
 
-  // Ambil data (pararel)
+  // Ambil data (pararel) - TERMASUK NET WORTH
   const [
     incomeSummary,
     expenseSummary,
@@ -54,6 +55,7 @@ export default async function DashboardPage({
     memberBreakdown,
     activePlans,
     pendingPlans,
+    netWorthData,
   ] = await Promise.all([
     getIncomeSummary(getRangeDates(incomeRange)),
     getExpenseSummary(getRangeDates(expenseRange)),
@@ -62,6 +64,7 @@ export default async function DashboardPage({
     getMemberBreakdown(activeMember.familyId),
     getActivePlans(activeMember.familyId),
     getPendingPlansCount(activeMember.familyId, activeMemberId!),
+    getNetWorthData(activeMember.familyId), // <-- Data Net Worth
   ])
 
   return (
@@ -77,6 +80,14 @@ export default async function DashboardPage({
           </span>
         </h1>
       </div>
+
+      {/* NET WORTH CARD - Sesuai Kaidah Akuntansi */}
+      <NetWorthCard
+        totalCash={netWorthData.totalCash}
+        totalAssets={netWorthData.totalAssets}
+        totalDebts={netWorthData.totalDebts}
+        netWorth={netWorthData.netWorth}
+      />
 
       {/* Alert Rencana Menunggu Persetujuan */}
       {pendingPlans > 0 && (
@@ -98,7 +109,7 @@ export default async function DashboardPage({
         </Link>
       )}
 
-      {/* Summary Cards — Client Wrapper */}
+      {/* Summary Cards — Client Wrapper (Pemasukan, Pengeluaran, Tabungan) */}
       <SummaryCardsWrapper
         income={{
           total: incomeSummary.total,

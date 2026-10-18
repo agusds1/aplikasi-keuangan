@@ -28,7 +28,7 @@ export function AccountFormSheet({ open, onOpenChange, account }: Props) {
     (account?.type as any) || 'BANK'
   )
   const [balance, setBalance] = useState(
-    account ? Math.round(parseFloat(account.initialBalance)).toString() : ''
+    account ? Math.round(parseFloat(account.initialBalance)).toString() : '0'
   )
   const [name, setName] = useState(account?.name || '')
 
