@@ -15,6 +15,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { format } from 'date-fns'
 import { id as idLocale } from 'date-fns/locale'
 import { formatCurrency } from '@/lib/format'
+import { ExportButtons } from '@/components/reports/export-buttons'
 
 export default async function ReportsPage() {
   const activeMemberId = await getActiveMemberId()
@@ -38,6 +39,7 @@ export default async function ReportsPage() {
         <p className="text-xs text-muted-foreground capitalize">
           {format(new Date(), 'MMMM yyyy', { locale: idLocale })}
         </p>
+        <ExportButtons />
       </div>
 
       {/* Pie Chart */}
